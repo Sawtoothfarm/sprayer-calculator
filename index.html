@@ -324,10 +324,6 @@
                 <input type="number" id="teejetFeet" value="30" min="1" step="0.5">
             </div>
             
-            <div class="form-group">
-                <label>Row Width - Inches (auto-calculated)</label>
-                <input type="number" id="teejetInches" value="360" readonly>
-            </div>
             
             <div class="form-group">
                 <label>Pressure (PSI)</label>
@@ -419,10 +415,6 @@
                 <div class="result-item">
                     <span class="result-label">Gallons per Acre</span>
                     <span class="result-value" id="gpa">-- GPA</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Row Width (Inches)</span>
-                    <span class="result-value" id="rowWidthInches">-- inches</span>
                 </div>
             </div>
             
@@ -643,11 +635,8 @@
             
             let gph = cimaChart[disc][closestPressure] || 127;
             let gpa = (gph * 500) / (speed * rowWidth * 60);
-            let rowWidthInches = rowWidth * 12;
-            
             document.getElementById('gph').textContent = gph + ' GPH';
             document.getElementById('gpa').textContent = gpa.toFixed(2) + ' GPA';
-            document.getElementById('rowWidthInches').textContent = rowWidthInches.toFixed(2) + ' inches';
             
             document.getElementById('cimaResults').classList.add('show');
         }
