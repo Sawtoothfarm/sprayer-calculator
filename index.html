@@ -1,94 +1,998 @@
-<script>
-// TeeJet nozzle data (example: page 89, DC13/DC23/DC25/DC45/DC46, D1-D10)
-// Fill in flowRates for all pressures you want; here I'm including 10,20,40,60,80,100 PSI for illustration
-const teejetNozzles = [];
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprayer Calibration Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-// Helper to generate all discs for a core
-function addCoreNozzles(core, flowsByDisc) {
-    for (let disc = 1; disc <= 10; disc++) {
-        teejetNozzles.push({
-            code: `DC${core}-D${disc}`,
-            core: core.toString(),
-            disc: disc,
-            flowRates: flowsByDisc[disc] // object: { "10": 0.xx, "20": 0.xx, ... }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* Tab Styles */
+        .tab-container {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 30px;
+            gap: 0;
+        }
+
+        .tab-button {
+            padding: 15px 30px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            color: #999;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab-button:hover {
+            color: #667eea;
+        }
+
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* TeeJet Styles */
+        .teejet-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .nozzle-set {
+            border: 2px solid #e0e0e0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background: #f9f9f9;
+        }
+
+        .nozzle-set-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .nozzle-set-header h4 {
+            color: #333;
+            font-size: 14px;
+        }
+
+        .remove-nozzle-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .results-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .result-unit {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-calculate {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-calculate:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-reset {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-reset:hover {
+            background: #d0d0d0;
+        }
+
+        .chart-section {
+            margin-top: 40px;
+            padding-top: 40px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .chart-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .chart-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .chart-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .chart-table td {
+            padding: 10px 12px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .chart-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .disc-number {
+            background: #fff3cd;
+            font-weight: 600;
+        }
+
+        .pressure-header {
+            background: #667eea;
+            color: white;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+
+        .nozzle-set {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .nozzle-set h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .nozzle-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .nozzle-info {
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+            grid-column: 1 / -1;
+        }
+
+        .add-nozzle-btn {
+            width: 100%;
+            background: #333;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .add-nozzle-btn:hover {
+            background: #222;
+        }
+
+        /* Cima Styles */
+        .cima-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            .teejet-content,
+            .cima-content {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .result-value {
+                font-size: 24px;
+            }
+
+            .chart-table {
+                font-size: 11px;
+            }
+
+            .chart-table th,
+            .chart-table td {
+                padding: 8px 6px;
+            }
+
+            .tab-button {
+                padding: 12px 20px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌾 Sprayer Calibration Calculator</h1>
+            <p>Calculate application rates for your sprayer</p>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-container">
+            <button class="tab-button active" onclick="switchTab('teejet')">
+                🌿 TeeJet Nozzle Calculator
+            </button>
+            <button class="tab-button" onclick="switchTab('cima')">
+                🌾 Cima Calibration Calculator
+            </button>
+        </div>
+
+        <!-- TeeJet Tab Content -->
+        <div id="teejet" class="tab-content active">
+            <div class="info-box">
+                <strong>TeeJet Nozzle Application Rate Calculator</strong> - Enter your sprayer setup parameters to calculate application rate
+            </div>
+
+            <div class="teejet-content">
+                <div class="form-section">
+                    <div class="nozzle-set">
+                        <h3>Nozzle Set 1</h3>
+                        <div class="nozzle-grid">
+                            <div class="form-group">
+                                <label>Nozzle Category</label>
+                                <select id="nozzleCategory" onchange="updateNozzleTypes()">
+                                    <option value="dc">Disc & Core</option>
+                                    <option value="ai">AI (Air Induction)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Nozzle Type</label>
+                                <select id="nozzleType">
+                                    <optgroup label="DC13">
+                                        <option value="0.05">DC13-D1 (0.050 GPM)</option>
+                                        <option value="0.08">DC13-D2 (0.080 GPM)</option>
+                                        <option value="0.1">DC13-D3 (0.100 GPM)</option>
+                                        <option value="0.15">DC13-D4 (0.150 GPM)</option>
+                                        <option value="0.2">DC13-D5 (0.200 GPM)</option>
+                                        <option value="0.25">DC13-D6 (0.250 GPM)</option>
+                                        <option value="0.3">DC13-D7 (0.300 GPM)</option>
+                                        <option value="0.35">DC13-D8 (0.350 GPM)</option>
+                                        <option value="0.4">DC13-D9 (0.400 GPM)</option>
+                                        <option value="0.5">DC13-D10 (0.500 GPM)</option>
+                                    </optgroup>
+                                    <optgroup label="DC23">
+                                        <option value="0.05">DC23-D1 (0.050 GPM)</option>
+                                        <option value="0.08">DC23-D2 (0.080 GPM)</option>
+                                        <option value="0.1">DC23-D3 (0.100 GPM)</option>
+                                        <option value="0.15">DC23-D4 (0.150 GPM)</option>
+                                        <option value="0.2">DC23-D5 (0.200 GPM)</option>
+                                        <option value="0.25">DC23-D6 (0.250 GPM)</option>
+                                        <option value="0.3">DC23-D7 (0.300 GPM)</option>
+                                        <option value="0.35">DC23-D8 (0.350 GPM)</option>
+                                        <option value="0.4">DC23-D9 (0.400 GPM)</option>
+                                        <option value="0.5">DC23-D10 (0.500 GPM)</option>
+                                    </optgroup>
+                                    <optgroup label="DC25">
+                                        <option value="0.05">DC25-D1 (0.050 GPM)</option>
+                                        <option value="0.08">DC25-D2 (0.080 GPM)</option>
+                                        <option value="0.1">DC25-D3 (0.100 GPM)</option>
+                                        <option value="0.15">DC25-D4 (0.150 GPM)</option>
+                                        <option value="0.2">DC25-D5 (0.200 GPM)</option>
+                                        <option value="0.25">DC25-D6 (0.250 GPM)</option>
+                                        <option value="0.3">DC25-D7 (0.300 GPM)</option>
+                                        <option value="0.35">DC25-D8 (0.350 GPM)</option>
+                                        <option value="0.4">DC25-D9 (0.400 GPM)</option>
+                                        <option value="0.5">DC25-D10 (0.500 GPM)</option>
+                                    </optgroup>
+                                    <optgroup label="DC45">
+                                        <option value="0.05">DC45-D1 (0.050 GPM)</option>
+                                        <option value="0.08">DC45-D2 (0.080 GPM)</option>
+                                        <option value="0.1">DC45-D3 (0.100 GPM)</option>
+                                        <option value="0.15">DC45-D4 (0.150 GPM)</option>
+                                        <option value="0.2">DC45-D5 (0.200 GPM)</option>
+                                        <option value="0.25">DC45-D6 (0.250 GPM)</option>
+                                        <option value="0.3">DC45-D7 (0.300 GPM)</option>
+                                        <option value="0.35">DC45-D8 (0.350 GPM)</option>
+                                        <option value="0.4">DC45-D9 (0.400 GPM)</option>
+                                        <option value="0.5">DC45-D10 (0.500 GPM)</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" id="nozzleQuantity" value="8" min="1">
+                        </div>
+                        <div class="nozzle-info" id="nozzleInfo">0.100 GPM each • 0.80 GPM total</div>
+                        <button id="addNozzleSetBtn" style="background: #667eea; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 10px; width: 100%;">+ Add Another Nozzle Set</button>
+                        <div id="additionalNozzleSets" style="margin-top: 20px;"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Row Width - Feet</label>
+                        <input type="number" id="teejetFeet" value="30" min="0" step="0.1">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Row Width - Inches</label>
+                        <input type="number" id="teejetInches" value="0" min="0" step="0.1">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Pressure (PSI)</label>
+                        <input type="number" id="teejetPressure" value="40" min="0" step="0.1">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ground Speed (MPH)</label>
+                        <input type="number" id="teejetSpeed" placeholder="Enter ground speed (e.g., 3, 5.5, 12.8)" min="0" step="0.1">
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-calculate" onclick="calculateTeeJet()">Calculate</button>
+                        <button class="btn-reset" onclick="resetTeeJet()">Reset</button>
+                    </div>
+                </div>
+
+                <div class="results-section">
+                    <div class="result-card">
+                        <div class="result-label">Application Rate</div>
+                        <div class="result-value" id="teejetGPA">--</div>
+                        <div class="result-unit">GPA</div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="result-label">Total Nozzles</div>
+                        <div class="result-value" id="teejetNozzles">--</div>
+                        <div class="result-unit">nozzles</div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="result-label">Total Flow Rate</div>
+                        <div class="result-value" id="teejetFlowRate">--</div>
+                        <div class="result-unit">GPM</div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="result-label">Time per Acre</div>
+                        <div class="result-value" id="teejetTimePerAcre">--</div>
+                        <div class="result-unit">minutes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cima Tab Content -->
+        <div id="cima" class="tab-content">
+            <div class="info-box">
+                <strong>Formula:</strong> (Gallons/acre × MPH × Row Width × 60) / 500 = Gallons/hour
+            </div>
+
+            <div class="cima-content">
+                <div class="form-section">
+                    <div class="form-group">
+                        <label for="cimaMph">Ground Speed (MPH)</label>
+                        <input type="number" id="cimaMph" placeholder="Enter speed (e.g., 5)" min="0" step="0.1">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cimaRowWidth">Row Width (feet)</label>
+                        <input type="number" id="cimaRowWidth" placeholder="Enter row width (e.g., 2.5)" min="0" step="0.1">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cimaPressure">Pressure (PSI)</label>
+                        <input type="number" id="cimaPressure" placeholder="Enter pressure (e.g., 20)" min="0" step="0.1">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cimaDiscNumber">Disc Number</label>
+                        <select id="cimaDiscNumber">
+                            <option value="">Select disc number</option>
+                            <option value="1">Disc 1</option>
+                            <option value="2">Disc 2</option>
+                            <option value="3">Disc 3</option>
+                            <option value="4">Disc 4</option>
+                            <option value="5">Disc 5</option>
+                            <option value="6">Disc 6</option>
+                            <option value="7">Disc 7</option>
+                            <option value="8">Disc 8</option>
+                            <option value="9">Disc 9</option>
+                            <option value="10">Disc 10</option>
+                            <option value="11">Disc 11</option>
+                            <option value="12">Disc 12</option>
+                            <option value="13">Disc 13</option>
+                            <option value="14">Disc 14</option>
+                            <option value="15">Disc 15</option>
+                        </select>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-calculate" onclick="calculateCima()">Calculate</button>
+                        <button class="btn-reset" onclick="resetCima()">Reset</button>
+                    </div>
+                </div>
+
+                <div class="results-section">
+                    <div class="result-card">
+                        <div class="result-label">Gallons per Hour</div>
+                        <div class="result-value" id="cimaGallonsPerHour">--</div>
+                        <div class="result-unit">From chart lookup</div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="result-label">Gallons per Acre</div>
+                        <div class="result-value" id="cimaGallonsPerAcre">--</div>
+                        <div class="result-unit">Calculated result</div>
+                    </div>
+
+                    <div class="result-card">
+                        <div class="result-label">Row Width (inches)</div>
+                        <div class="result-value" id="cimaRowWidthInches">--</div>
+                        <div class="result-unit">Converted from feet</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-section">
+                <h2>Cima Calibration Chart - Gallons/Hour at Different Pressures</h2>
+                <p style="margin-bottom: 15px; color: #666; font-size: 13px;">
+                    <strong>Note:</strong> Chart shows gallons/hour values for different disc numbers and pressure settings (converted from bar to PSI).
+                </p>
+                <table class="chart-table">
+                    <thead>
+                        <tr>
+                            <th class="pressure-header">Disc</th>
+                            <th class="pressure-header">1.2 Bar (17.4 PSI)</th>
+                            <th class="pressure-header">1.5 Bar (21.8 PSI)</th>
+                            <th class="pressure-header">2.0 Bar (29.0 PSI)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td class="disc-number">1</td><td>42</td><td>53</td><td>58</td></tr>
+                        <tr><td class="disc-number">2</td><td>53</td><td>63</td><td>69</td></tr>
+                        <tr><td class="disc-number">3</td><td>74</td><td>84</td><td>95</td></tr>
+                        <tr><td class="disc-number">4</td><td>100</td><td>111</td><td>121</td></tr>
+                        <tr><td class="disc-number">5</td><td>127</td><td>137</td><td>148</td></tr>
+                        <tr><td class="disc-number">6</td><td>148</td><td>161</td><td>177</td></tr>
+                        <tr><td class="disc-number">7</td><td>193</td><td>209</td><td>232</td></tr>
+                        <tr><td class="disc-number">8</td><td>238</td><td>253</td><td>285</td></tr>
+                        <tr><td class="disc-number">9</td><td>269</td><td>301</td><td>335</td></tr>
+                        <tr><td class="disc-number">10</td><td>290</td><td>333</td><td>385</td></tr>
+                        <tr><td class="disc-number">11</td><td>338</td><td>380</td><td>444</td></tr>
+                        <tr><td class="disc-number">12</td><td>417</td><td>457</td><td>533</td></tr>
+                        <tr><td class="disc-number">13</td><td>539</td><td>597</td><td>660</td></tr>
+                        <tr><td class="disc-number">14</td><td>581</td><td>642</td><td>755</td></tr>
+                        <tr><td class="disc-number">15</td><td>618</td><td>686</td><td>795</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+
+        // TeeJet Calculator Functions
+        // Nozzle base flow rates at 40 PSI (reference pressure)
+        const nozzleBaseFlows = {
+            dc: [
+                // DC13 series - from hollow cone chart at 40 PSI
+                { id: 'DC13-D1', text: 'DC13-D1', baseFlow: 0.066 },
+                { id: 'DC13-D2', text: 'DC13-D2', baseFlow: 0.080 },
+                { id: 'DC13-D3', text: 'DC13-D3', baseFlow: 0.090 },
+                { id: 'DC13-D4', text: 'DC13-D4', baseFlow: 0.120 },
+                { id: 'DC13-D5', text: 'DC13-D5', baseFlow: 0.140 },
+                { id: 'DC13-D6', text: 'DC13-D6', baseFlow: 0.160 },
+                { id: 'DC13-D7', text: 'DC13-D7', baseFlow: 0.200 },
+                { id: 'DC13-D8', text: 'DC13-D8', baseFlow: 0.230 },
+                { id: 'DC13-D9', text: 'DC13-D9', baseFlow: 0.270 },
+                { id: 'DC13-D10', text: 'DC13-D10', baseFlow: 0.270 },
+                // DC23 series - from hollow cone chart at 40 PSI
+                { id: 'DC23-D1', text: 'DC23-D1', baseFlow: 0.072 },
+                { id: 'DC23-D2', text: 'DC23-D2', baseFlow: 0.100 },
+                { id: 'DC23-D3', text: 'DC23-D3', baseFlow: 0.120 },
+                { id: 'DC23-D4', text: 'DC23-D4', baseFlow: 0.150 },
+                { id: 'DC23-D5', text: 'DC23-D5', baseFlow: 0.180 },
+                { id: 'DC23-D6', text: 'DC23-D6', baseFlow: 0.210 },
+                { id: 'DC23-D7', text: 'DC23-D7', baseFlow: 0.280 },
+                { id: 'DC23-D8', text: 'DC23-D8', baseFlow: 0.320 },
+                { id: 'DC23-D9', text: 'DC23-D9', baseFlow: 0.380 },
+                { id: 'DC23-D10', text: 'DC23-D10', baseFlow: 0.460 },
+                // DC25 series - from hollow cone chart at 40 PSI
+                { id: 'DC25-D1', text: 'DC25-D1', baseFlow: 0.101 },
+                { id: 'DC25-D2', text: 'DC25-D2', baseFlow: 0.160 },
+                { id: 'DC25-D3', text: 'DC25-D3', baseFlow: 0.170 },
+                { id: 'DC25-D4', text: 'DC25-D4', baseFlow: 0.290 },
+                { id: 'DC25-D5', text: 'DC25-D5', baseFlow: 0.350 },
+                { id: 'DC25-D6', text: 'DC25-D6', baseFlow: 0.440 },
+                { id: 'DC25-D7', text: 'DC25-D7', baseFlow: 0.520 },
+                { id: 'DC25-D8', text: 'DC25-D8', baseFlow: 0.610 },
+                { id: 'DC25-D10', text: 'DC25-D10', baseFlow: 0.760 },
+                { id: 'DC25-D12', text: 'DC25-D12', baseFlow: 0.930 },
+                { id: 'DC25-D14', text: 'DC25-D14', baseFlow: 1.030 },
+                // DC45 series - from hollow cone chart at 40 PSI
+                { id: 'DC45-D1', text: 'DC45-D1', baseFlow: 0.125 },
+                { id: 'DC45-D2', text: 'DC45-D2', baseFlow: 0.200 },
+                { id: 'DC45-D3', text: 'DC45-D3', baseFlow: 0.230 },
+                { id: 'DC45-D4', text: 'DC45-D4', baseFlow: 0.360 },
+                { id: 'DC45-D5', text: 'DC45-D5', baseFlow: 0.450 },
+                { id: 'DC45-D6', text: 'DC45-D6', baseFlow: 0.580 },
+                { id: 'DC45-D7', text: 'DC45-D7', baseFlow: 0.680 },
+                { id: 'DC45-D8', text: 'DC45-D8', baseFlow: 0.840 },
+                { id: 'DC45-D10', text: 'DC45-D10', baseFlow: 1.100 },
+                { id: 'DC45-D12', text: 'DC45-D12', baseFlow: 1.530 },
+                { id: 'DC45-D14', text: 'DC45-D14', baseFlow: 1.790 },
+                { id: 'DC45-D16', text: 'DC45-D16', baseFlow: 2.200 }
+            ],
+            ai: [
+                { id: 'AI01', text: 'AI01 - Orange', baseFlow: 0.100 },
+                { id: 'AI015', text: 'AI015 - Green', baseFlow: 0.150 },
+                { id: 'AI02', text: 'AI02 - Yellow', baseFlow: 0.200 },
+                { id: 'AI025', text: 'AI025 - Lilac', baseFlow: 0.250 },
+                { id: 'AI03', text: 'AI03 - Blue', baseFlow: 0.300 },
+                { id: 'AI035', text: 'AI035 - Brown/Red', baseFlow: 0.350 },
+                { id: 'AI04', text: 'AI04 - Red', baseFlow: 0.400 },
+                { id: 'AI05', text: 'AI05 - Brown', baseFlow: 0.500 },
+                { id: 'AI06', text: 'AI06 - Gray', baseFlow: 0.600 },
+                { id: 'AI08', text: 'AI08 - White', baseFlow: 0.800 },
+                { id: 'AI10', text: 'AI10 - Light Blue', baseFlow: 1.000 }
+            ]
+        };
+
+        // Function to calculate flow rate based on pressure
+        function getFlowAtPressure(baseFlow, basePressure = 40) {
+            const currentPressure = parseFloat(document.getElementById('teejetPressure').value) || 40;
+            // Flow varies with square root of pressure
+            return baseFlow * Math.sqrt(currentPressure / basePressure);
+        }
+
+        function updateNozzleTypes(setId) {
+            const category = setId === undefined ? document.getElementById('nozzleCategory').value : document.getElementById(`nozzleCategory-${setId}`).value;
+            const nozzleTypeSelect = setId === undefined ? document.getElementById('nozzleType') : document.getElementById(`nozzleType-${setId}`);
+            const options = nozzleBaseFlows[category];
+            
+            nozzleTypeSelect.innerHTML = '';
+            
+            // Group options by disc number for DC
+            if (category === 'dc') {
+                const dcGroups = {};
+                options.forEach(opt => {
+                    const discNum = opt.id.split('-')[0];
+                    if (!dcGroups[discNum]) dcGroups[discNum] = [];
+                    dcGroups[discNum].push(opt);
+                });
+                
+                Object.keys(dcGroups).forEach(discNum => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = discNum;
+                    dcGroups[discNum].forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt.id;
+                        option.textContent = opt.text;
+                        optgroup.appendChild(option);
+                    });
+                    nozzleTypeSelect.appendChild(optgroup);
+                });
+            } else {
+                // For AI, just add options without grouping
+                options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt.id;
+                    option.textContent = opt.text;
+                    nozzleTypeSelect.appendChild(option);
+                });
+            }
+            
+            updateNozzleInfo(setId);
+        }
+
+        function updateNozzleInfo(setId) {
+            const category = setId === undefined ? document.getElementById('nozzleCategory').value : document.getElementById(`nozzleCategory-${setId}`).value;
+            const nozzleTypeSelect = setId === undefined ? document.getElementById('nozzleType') : document.getElementById(`nozzleType-${setId}`);
+            const quantityInput = setId === undefined ? document.getElementById('nozzleQuantity') : document.getElementById(`nozzleQuantity-${setId}`);
+            const infoDisplay = setId === undefined ? document.getElementById('nozzleInfo') : document.getElementById(`nozzleInfo-${setId}`);
+            
+            const selectedNozzleId = nozzleTypeSelect.value;
+            const options = nozzleBaseFlows[category];
+            const selectedNozzle = options.find(opt => opt.id === selectedNozzleId);
+            
+            if (selectedNozzle) {
+                const flowPerNozzle = getFlowAtPressure(selectedNozzle.baseFlow);
+                const quantity = parseFloat(quantityInput.value) || 0;
+                const totalFlow = quantity * flowPerNozzle;
+                infoDisplay.textContent = `${flowPerNozzle.toFixed(3)} GPM each • ${totalFlow.toFixed(2)} GPM total`;
+            }
+        }
+
+        document.getElementById('nozzleQuantity').addEventListener('change', () => updateNozzleInfo());
+        document.getElementById('nozzleType').addEventListener('change', () => updateNozzleInfo());
+        document.getElementById('nozzleCategory').addEventListener('change', updateNozzleTypes);
+        
+        // Update all nozzle sets when pressure changes
+        document.getElementById('teejetPressure').addEventListener('change', () => {
+            updateNozzleInfo(); // Update primary nozzle set
+            // Update all additional nozzle sets
+            const additionalSets = document.querySelectorAll('[id^="nozzle-set-"]');
+            additionalSets.forEach(set => {
+                const setId = set.id.split('-')[2];
+                updateNozzleInfo(setId);
+            });
         });
-    }
-}
 
-// Example flows — replace these with actual page 89 values
-addCoreNozzles(13, {
-    1: { "10":0.08,"20":0.11,"40":0.15,"60":0.18,"80":0.21,"100":0.23 },
-    2: { "10":0.10,"20":0.14,"40":0.18,"60":0.22,"80":0.26,"100":0.29 },
-    3: { "10":0.12,"20":0.16,"40":0.22,"60":0.26,"80":0.30,"100":0.34 },
-    4: { "10":0.13,"20":0.19,"40":0.25,"60":0.30,"80":0.35,"100":0.40 },
-    5: { "10":0.14,"20":0.21,"40":0.28,"60":0.34,"80":0.39,"100":0.44 },
-    6: { "10":0.16,"20":0.23,"40":0.31,"60":0.38,"80":0.44,"100":0.50 },
-    7: { "10":0.17,"20":0.25,"40":0.34,"60":0.42,"80":0.49,"100":0.56 },
-    8: { "10":0.19,"20":0.28,"40":0.38,"60":0.46,"80":0.54,"100":0.62 },
-    9: { "10":0.21,"20":0.31,"40":0.42,"60":0.51,"80":0.60,"100":0.68 },
-    10:{ "10":0.23,"20":0.34,"40":0.46,"60":0.56,"80":0.66,"100":0.75 }
-});
+        let nozzleSetCount = 0;
 
-// Repeat for DC23, DC25, DC45, DC46 using the same pattern
-// Example for DC46, replace with actual flows
-addCoreNozzles(46, {
-    1: {"10":0.45,"20":0.60,"40":0.85,"60":1.05,"80":1.25,"100":1.45},
-    2: {"10":0.50,"20":0.68,"40":0.95,"60":1.20,"80":1.40,"100":1.60},
-    3: {"10":0.55,"20":0.75,"40":1.05,"60":1.30,"80":1.55,"100":1.75},
-    4: {"10":0.60,"20":0.78,"40":1.10,"60":1.35,"80":1.55,"100":1.74},
-    5: {"10":0.65,"20":0.85,"40":1.15,"60":1.45,"80":1.65,"100":1.85},
-    6: {"10":0.70,"20":0.90,"40":1.20,"60":1.50,"80":1.70,"100":1.90},
-    7: {"10":0.75,"20":0.95,"40":1.25,"60":1.55,"80":1.80,"100":2.00},
-    8: {"10":0.80,"20":1.00,"40":1.35,"60":1.60,"80":1.85,"100":2.05},
-    9: {"10":0.85,"20":1.05,"40":1.40,"60":1.65,"80":1.90,"100":2.15},
-    10:{"10":0.90,"20":1.10,"40":1.45,"60":1.70,"80":1.95,"100":2.20}
-});
+        function addNozzleSet() {
+            nozzleSetCount++;
+            const container = document.getElementById('additionalNozzleSets');
+            const setDiv = document.createElement('div');
+            setDiv.className = 'nozzle-set';
+            setDiv.id = `nozzle-set-${nozzleSetCount}`;
+            
+            // Build options dynamically
+            let optionsHTML = '';
+            const dcOptions = nozzleBaseFlows.dc;
+            const dcGroups = {};
+            dcOptions.forEach(opt => {
+                const discNum = opt.id.split('-')[0];
+                if (!dcGroups[discNum]) dcGroups[discNum] = [];
+                dcGroups[discNum].push(opt);
+            });
+            
+            Object.keys(dcGroups).forEach(discNum => {
+                optionsHTML += `<optgroup label="${discNum}">`;
+                dcGroups[discNum].forEach(opt => {
+                    optionsHTML += `<option value="${opt.id}">${opt.text}</option>`;
+                });
+                optionsHTML += `</optgroup>`;
+            });
+            
+            setDiv.innerHTML = `
+                <div class="nozzle-set-header">
+                    <h4>Nozzle Set ${nozzleSetCount + 1}</h4>
+                    <button class="remove-nozzle-btn" onclick="removeNozzleSet(${nozzleSetCount})">Remove</button>
+                </div>
+                <div class="form-group">
+                    <label>Nozzle Category</label>
+                    <select id="nozzleCategory-${nozzleSetCount}" onchange="updateNozzleTypes(${nozzleSetCount})">
+                        <option value="dc">Disc & Core</option>
+                        <option value="ai">AI (Air Induction)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nozzle Type</label>
+                    <select id="nozzleType-${nozzleSetCount}" onchange="updateNozzleInfo(${nozzleSetCount})">
+                        ${optionsHTML}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input id="nozzleQuantity-${nozzleSetCount}" type="number" value="8" min="1" onchange="updateNozzleInfo(${nozzleSetCount})"></input>
+                </div>
+                <div class="nozzle-info" id="nozzleInfo-${nozzleSetCount}">0.100 GPM each • 0.80 GPM total</div>
+            `;
+            container.appendChild(setDiv);
+        }
 
-// Helper: get flow for a nozzle & PSI
-function getFlowRate(nozzleCode, psi) {
-    const nozzle = teejetNozzles.find(n => n.code === nozzleCode);
-    if (!nozzle) return 0;
-    return nozzle.flowRates[String(psi)] || 0;
-}
+        function removeNozzleSet(setId) {
+            const setDiv = document.getElementById(`nozzle-set-${setId}`);
+            if (setDiv) {
+                setDiv.remove();
+            }
+        }
 
-// Populate nozzle type dropdown
-function updateNozzleType() {
-    const category = document.getElementById('nozzleCategory').value;
-    const typeSelect = document.getElementById('nozzleType');
-    typeSelect.innerHTML = '';
+        document.getElementById('addNozzleSetBtn').addEventListener('click', addNozzleSet);
 
-    let options = [];
-    if (category === '') {
-        options = teejetNozzles.map(n => n.code);
-    } else if (category === 'ai') {
-        options = ['AI01','AI015','AI02','AI025','AI03','AI035','AI04','AI05','AI06','AI08','AI10'];
-    }
+        function calculateTeeJet() {
+            const feet = parseFloat(document.getElementById('teejetFeet').value) || 0;
+            const inches = parseFloat(document.getElementById('teejetInches').value) || 0;
+            const speed = parseFloat(document.getElementById('teejetSpeed').value);
 
-    options.forEach(opt => {
-        const option = document.createElement('option');
-        option.value = opt.toLowerCase();
-        option.textContent = opt.toUpperCase();
-        typeSelect.appendChild(option);
-    });
+            if (!speed || speed <= 0) {
+                alert('Please enter a valid ground speed');
+                return;
+            }
 
-    updateNozzleInfo();
-}
+            // Calculate for primary nozzle set
+            const category = document.getElementById('nozzleCategory').value;
+            const nozzleId = document.getElementById('nozzleType').value;
+            const quantity = parseFloat(document.getElementById('nozzleQuantity').value) || 0;
+            const options = nozzleBaseFlows[category];
+            const selectedNozzle = options.find(opt => opt.id === nozzleId);
+            const flowPerNozzle = selectedNozzle ? getFlowAtPressure(selectedNozzle.baseFlow) : 0.1;
+            
+            let totalQuantity = quantity;
+            let totalFlow = quantity * flowPerNozzle;
 
-// Update nozzle info display
-function updateNozzleInfo() {
-    const category = document.getElementById('nozzleCategory').value;
-    const nozzleType = document.getElementById('nozzleType').value;
-    const quantity = parseInt(document.getElementById('nozzleQuantity').value) || 8;
-    const pressure = parseFloat(document.getElementById('teejetPressure').value) || 40;
+            // Calculate for additional nozzle sets
+            const additionalSets = document.querySelectorAll('[id^="nozzle-set-"]');
+            additionalSets.forEach(set => {
+                const setId = set.id.split('-')[2];
+                const addCategory = document.getElementById(`nozzleCategory-${setId}`).value;
+                const addNozzleId = document.getElementById(`nozzleType-${setId}`).value;
+                const addQuantity = parseFloat(document.getElementById(`nozzleQuantity-${setId}`).value) || 0;
+                const addOptions = nozzleBaseFlows[addCategory];
+                const addSelectedNozzle = addOptions.find(opt => opt.id === addNozzleId);
+                const addFlowPerNozzle = addSelectedNozzle ? getFlowAtPressure(addSelectedNozzle.baseFlow) : 0.1;
+                totalQuantity += addQuantity;
+                totalFlow += addQuantity * addFlowPerNozzle;
+            });
 
-    let gpmEach = 0;
+            const totalRowWidth = feet * 12 + inches;
+            const timePerAcre = (43560 / (speed * 5280 / 3600)) / (totalRowWidth / 12) / 60;
+            const gpa = timePerAcre * totalFlow;
 
-    if (category === '') { // TeeJet
-        gpmEach = getFlowRate(nozzleType.toUpperCase(), pressure);
-    } else { // AI
-        gpmEach = 0.1; // example, replace with actual AI values
-    }
+            document.getElementById('teejetGPA').textContent = gpa.toFixed(2);
+            document.getElementById('teejetNozzles').textContent = totalQuantity.toFixed(0);
+            document.getElementById('teejetFlowRate').textContent = totalFlow.toFixed(2);
+            document.getElementById('teejetTimePerAcre').textContent = timePerAcre.toFixed(2);
+        }
 
-    const totalFlow = gpmEach * quantity;
+        function resetTeeJet() {
+            document.getElementById('teejetFeet').value = '30';
+            document.getElementById('teejetInches').value = '0';
+            document.getElementById('teejetPressure').value = '40';
+            document.getElementById('teejetSpeed').value = '';
+            document.getElementById('nozzleQuantity').value = '8';
+            document.getElementById('teejetGPA').textContent = '--';
+            document.getElementById('teejetNozzles').textContent = '--';
+            document.getElementById('teejetFlowRate').textContent = '--';
+            document.getElementById('teejetTimePerAcre').textContent = '--';
+            updateNozzleInfo();
+        }
 
-    document.getElementById('nozzleInfo').textContent = `${gpmEach.toFixed(3)} GPM each • ${total
+        // Cima Calculator Functions
+        const calibrationChart = {
+            1: { 17.4: 42, 21.8: 53, 29.0: 58 },
+            2: { 17.4: 53, 21.8: 63, 29.0: 69 },
+            3: { 17.4: 74, 21.8: 84, 29.0: 95 },
+            4: { 17.4: 100, 21.8: 111, 29.0: 121 },
+            5: { 17.4: 127, 21.8: 137, 29.0: 148 },
+            6: { 17.4: 148, 21.8: 161, 29.0: 177 },
+            7: { 17.4: 193, 21.8: 209, 29.0: 232 },
+            8: { 17.4: 238, 21.8: 253, 29.0: 285 },
+            9: { 17.4: 269, 21.8: 301, 29.0: 335 },
+            10: { 17.4: 290, 21.8: 333, 29.0: 385 },
+            11: { 17.4: 338, 21.8: 380, 29.0: 444 },
+            12: { 17.4: 417, 21.8: 457, 29.0: 533 },
+            13: { 17.4: 539, 21.8: 597, 29.0: 660 },
+            14: { 17.4: 581, 21.8: 642, 29.0: 755 },
+            15: { 17.4: 618, 21.8: 686, 29.0: 795 }
+        };
+
+        function findClosestPressure(targetPressure) {
+            const pressures = [17.4, 21.8, 29.0];
+            let closest = pressures[0];
+            let minDiff = Math.abs(targetPressure - pressures[0]);
+
+            for (let pressure of pressures) {
+                const diff = Math.abs(targetPressure - pressure);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = pressure;
+                }
+            }
+            return closest;
+        }
+
+        function getGallonsPerHour(discNumber, pressure) {
+            const disc = parseInt(discNumber);
+            if (!calibrationChart[disc]) return null;
+
+            const closestPressure = findClosestPressure(pressure);
+            return calibrationChart[disc][closestPressure];
+        }
+
+        function calculateCima() {
+            const mph = parseFloat(document.getElementById('cimaMph').value);
+            const rowWidthFeet = parseFloat(document.getElementById('cimaRowWidth').value);
+            const pressure = parseFloat(document.getElementById('cimaPressure').value);
+            const discNumber = document.getElementById('cimaDiscNumber').value;
+
+            if (!mph || !rowWidthFeet || !pressure || !discNumber) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            if (mph <= 0 || rowWidthFeet <= 0 || pressure <= 0) {
+                alert('All values must be greater than 0');
+                return;
+            }
+
+            const gallonsPerHour = getGallonsPerHour(discNumber, pressure);
+
+            if (gallonsPerHour === null) {
+                alert('Invalid disc number');
+                return;
+            }
+
+            const rowWidthInches = rowWidthFeet * 12;
+            const gallonsPerAcre = (gallonsPerHour * 500) / (mph * rowWidthFeet * 60);
+
+            document.getElementById('cimaGallonsPerHour').textContent = gallonsPerHour.toFixed(1);
+            document.getElementById('cimaGallonsPerAcre').textContent = gallonsPerAcre.toFixed(2);
+            document.getElementById('cimaRowWidthInches').textContent = rowWidthInches.toFixed(2);
+        }
+
+        function resetCima() {
+            document.getElementById('cimaMph').value = '';
+            document.getElementById('cimaRowWidth').value = '';
+            document.getElementById('cimaPressure').value = '';
+            document.getElementById('cimaDiscNumber').value = '';
+            document.getElementById('cimaGallonsPerHour').textContent = '--';
+            document.getElementById('cimaGallonsPerAcre').textContent = '--';
+            document.getElementById('cimaRowWidthInches').textContent = '--';
+        }
+
+        // Initialize
+        updateNozzleTypes();
+    </script>
+</body>
+</html>
